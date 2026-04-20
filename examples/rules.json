@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "segment_name": "step2_start",
+      "condition_canid": "200",
+      "condition_data": "AABBCCDDEEFF0011"
+    },
+    {
+      "segment_name": "step3_start",
+      "condition_canid": "300",
+      "condition_data": "9988776655443322"
+    }
+  ]
+}
