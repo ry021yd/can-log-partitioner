@@ -1,14 +1,19 @@
 {
   "rules": [
     {
-      "segment_name": "step2_start",
-      "condition_canid": "200",
-      "condition_data": "AABBCCDDEEFF0011"
+      "segment_name": "second_step",
+      "condition_canid": "500",
+      "condition_data": "1122334455667788"
     },
     {
-      "segment_name": "step3_start",
-      "condition_canid": "300",
-      "condition_data": "9988776655443322"
+      "segment_name": "final_step",
+      "condition_canid": "501",
+      "condition_data": "AABBCCDDEEFF1122"
+    },
+    {
+      "segment_name": "error",
+      "condition_canid": "56B",
+      "condition_data": "5BDB2C33"
     }
   ]
 }
