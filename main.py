@@ -1,13 +1,10 @@
 import argparse
 import glob
-import os
 from pathlib import Path
-import shutil
 import sys
-import tempfile
 
 from asc_split_checker import AscSplitChecker, load_rules_from_json
-from file_splitter import FileSplitter, SplitEngine
+from file_splitter import FileSplitConfig, FileSplitter
 
 def collect_files(patterns):
     """Collect files by glob patterns
@@ -34,7 +31,7 @@ def get_asc_header(input_asc, encoding="utf-8"):
         encoding: encoding of the files
 
     Returns:
-        header_lines: list of header lines to prepend to each segment file
+        header_lines: tuple of header lines to prepend to each segment file
     """
     header_lines = []
     with Path(input_asc).open("r", encoding=encoding) as f:
@@ -44,7 +41,7 @@ def get_asc_header(input_asc, encoding="utf-8"):
                 break
             header_lines.append(line)
     
-    return header_lines
+    return tuple(header_lines)
 
 def split_canasc(input_ascs, rule_json, output_dir, encoding="utf-8"):
     """Split CANASC files according to rules
@@ -74,17 +71,18 @@ def split_canasc(input_ascs, rule_json, output_dir, encoding="utf-8"):
         checker = AscSplitChecker(
             rules=rules
         )
-        engine = SplitEngine(
+        config = FileSplitConfig(
             input_file=asc,
             output_dir=output_dir,
             header_lines=header_lines,
             encoding=encoding,
+            initial_segment_name="initial"
         )
         splitter = FileSplitter(
             checker=checker,
-            engine=engine
+            config=config
         )
-        split_result = splitter.split_file(asc)
+        split_result = splitter.split_file()
         results.append(split_result)
 
     return results
