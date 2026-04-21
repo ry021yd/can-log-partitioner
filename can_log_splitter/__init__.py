@@ -1,12 +1,19 @@
-import argparse
 import glob
 from pathlib import Path
-import sys
 
-from asc_split_checker import AscSplitChecker, load_rules_from_json
-from file_splitter import FileSplitConfig, FileSplitter
+from .asc_split_checker import AscSplitChecker, load_rules_from_json
+from .file_splitter import FileSplitConfig, FileSplitter, SegmentMeta, SplitChecker, HeaderTarget, SegmentEvent
 
-def collect_files(patterns):
+__all__ = [
+    "split_canasc",
+    "FileSplitConfig",
+    "FileSplitter",
+    "SplitChecker",
+    "HeaderTarget",
+    "SegmentEvent",
+]
+
+def collect_files(patterns: list[str]) -> list[str]:
     """Collect files by glob patterns
     Args:
         patterns: array of glob patterns
@@ -43,7 +50,12 @@ def get_asc_header(input_asc, encoding="utf-8"):
     
     return tuple(header_lines)
 
-def split_canasc(input_ascs, rule_json, output_dir, encoding="utf-8"):
+def split_canasc(
+        input_ascs: list[str],
+        rule_json: str,
+        output_dir: str,
+        encoding="utf-8"
+    ) -> list[SegmentMeta]:
     """Split CANASC files according to rules
 
     Args:
@@ -57,8 +69,8 @@ def split_canasc(input_ascs, rule_json, output_dir, encoding="utf-8"):
     """
 
     output_dir = Path(output_dir)
-    rules=load_rules_from_json(rule_json)
-    results = []
+    rules = load_rules_from_json(rule_json)
+    results: list[SegmentMeta] = []
 
     for asc in input_ascs:
         if not asc.endswith(".asc"):
@@ -83,27 +95,6 @@ def split_canasc(input_ascs, rule_json, output_dir, encoding="utf-8"):
             config=config
         )
         split_result = splitter.split_file()
-        results.append(split_result)
+        results.extend(split_result)
 
     return results
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input_files", help="Input files to process; glob patterns are also accepted", nargs="+")
-    parser.add_argument("rule_file", help="Rule file to use for judging to split or not")
-    parser.add_argument("output_dir", help="Output directory to write results to")
-    parser.add_argument("--encoding", help="Encoding of the files (default: utf-8)", default="utf-8")
-    args = parser.parse_args()
-
-    input_files = collect_files(args.input_files)
-    split_canasc(
-        input_ascs=input_files,
-        rule_json=args.rule_file,
-        output_dir=args.output_dir,
-        encoding=args.encoding,
-    )
-
-    return 0
-
-if __name__ == "__main__":
-    sys.exit(main())

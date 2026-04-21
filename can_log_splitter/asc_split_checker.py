@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from file_splitter import SegmentEvent, SplitChecker
+from .file_splitter import SegmentEvent, SplitChecker
 
 @dataclass
 class AscMatchRule:
