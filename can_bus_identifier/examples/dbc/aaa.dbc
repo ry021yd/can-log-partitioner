@@ -1,0 +1,8 @@
+VERSION ""
+NS_ :
+BS_:
+
+BU_: ECUA ECUX
+
+BO_ 100 Msg100: 8 ECUX
+BO_ 123 Msg123: 8 ECUA

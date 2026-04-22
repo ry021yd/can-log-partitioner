@@ -1,0 +1,8 @@
+VERSION ""
+NS_ :
+BS_:
+
+BU_: ECUB ECUBB
+
+BO_ 252 Msg252: 8 ECUB
+BO_ 345 Msg345: 8 ECUBB

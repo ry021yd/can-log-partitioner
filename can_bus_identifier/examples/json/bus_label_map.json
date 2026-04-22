@@ -1,0 +1,20 @@
+{
+  "map": [
+    {
+      "file_pattern": "*aaa*.dbc",
+      "bus_label": "AAA"
+    },
+    {
+      "file_pattern": "*bbb*.dbc",
+      "bus_label": "BBB"
+    },
+    {
+      "file_pattern": "*ccc*.dbc",
+      "bus_label": "CCC"
+    },
+    {
+      "file_pattern": "*ddd*.dbc",
+      "bus_label": "DDD"
+    }
+  ]
+}
