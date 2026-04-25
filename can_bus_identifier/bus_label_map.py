@@ -15,7 +15,7 @@ class BusLabelMap:
     def resolve(self, file: str) -> str:
         name = Path(file).name
         for rule in self.rules:
-            if fnmatch(name, rule["file_pattern"]):
+            if fnmatch(name, rule.file_pattern):
                 return rule.bus_label
         return Path(file).stem
 

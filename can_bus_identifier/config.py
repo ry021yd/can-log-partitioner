@@ -12,6 +12,21 @@ class IgnoreIdRule:
 
     def matches(self, can_id: int) -> bool:
         return (can_id & self.mask) == (self.value & self.mask)
+    
+    @classmethod
+    def from_json_dict(cls, data: dict[str, Any], idx: int) -> "IgnoreIdRule":
+        value = data.get("value")
+        mask = data.get("mask")
+
+        if not isinstance(value, str):
+            raise ValueError(f"ignore_id_rules[{idx}].value must be a string.")
+        if not isinstance(mask, str):
+            raise ValueError(f"ignore_id_rules[{idx}].mask must be a string.")
+
+        return cls(
+            value=hex_canid_to_int(value),
+            mask=hex_canid_to_int(mask),
+        )
 
 @dataclass(frozen=True)
 class IdentifierConfig:
