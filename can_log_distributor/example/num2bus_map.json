@@ -1,0 +1,30 @@
+[
+  {
+    "bus_number": "1",
+    "result": "resolved",
+    "labels": [
+      "AAA"
+    ]
+  },
+  {
+    "bus_number": "2",
+    "result": "resolved",
+    "labels": [
+      "BBB"
+    ]
+  },
+  {
+    "bus_number": "3",
+    "result": "resolved",
+    "labels": [
+      "CCC"
+    ]
+  },
+  {
+    "bus_number": "4",
+    "result": "resolved",
+    "labels": [
+      "DDD"
+    ]
+  }
+]

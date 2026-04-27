@@ -9,6 +9,7 @@ from .bus_resolver import (
 )
 from .config import IdentifierConfig, IgnoreIdRule
 from .id2bus_map import Id2BusMap
+from .num2bus_map import Num2BusMap
 
 __all__ = [
     "AscFrame",
@@ -23,4 +24,5 @@ __all__ = [
     "IdentifierConfig",
     "IgnoreIdRule",
     "Id2BusMap",
+    "Num2BusMap"
 ]
