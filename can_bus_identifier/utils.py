@@ -2,6 +2,8 @@ import glob
 
 def hex_canid_to_int(value: str) -> int:
     value = value.strip()
+    if value.endswith(('x', 'X')):
+        value = value[:-1]
     return int(value, 16)
 
 def int_canid_to_hex(value: int) -> str:
