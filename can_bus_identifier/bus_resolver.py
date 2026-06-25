@@ -1,58 +1,12 @@
-import argparse
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
-from enum import Enum
-import json
 from pathlib import Path
-import pprint
-import sys
 
-from .config import IdentifierConfig
 from .asc_frame import parse_asc_frame
+from .config import IdentifierConfig
 from .id2bus_map import Id2BusMap
+from .resolver_types import BusResolveState, ResolveMode, ResolveResult
+from .score_resolver import format_score_output
 from .utils import int_canid_to_hex
 
-UNIQUE_ID_SCORE = 10
-SHARED_ID_SCORE = 2
-FOREIGN_ID_PENALTY = 1
-
-@dataclass
-class BusResolveState:
-    bus_number: str
-    candidates: set[str] | None = None
-    matched_ids: set[int] = field(default_factory=set)
-    ignored_ids: set[int] = field(default_factory=set)
-    unknown_ids: set[int] = field(default_factory=set)
-    observed_id_counts: Counter[int] = field(default_factory=Counter)
-
-    def record_observed(self, can_id: int) -> None:
-        self.observed_id_counts[can_id] += 1
-
-    def observe(self, can_id: int, labels: set[str]) -> None:
-        if self.candidates is None:
-            self.candidates = set(labels)
-        else:
-            self.candidates &= labels
-
-        self.matched_ids.add(can_id)
-
-    def ignore(self, can_id: int) -> None:
-        self.ignored_ids.add(can_id)
-
-    def unknown(self, can_id: int) -> None:
-        self.unknown_ids.add(can_id)
-
-class ResolveResult(Enum):
-    RESOLVED = "resolved"
-    MULTIPLE_CANDIDATES = "multiple candidates"
-    NO_CANDIDATES = "no candidates"
-    NO_VALID_ID_FOUND = "no valid id found"
-    RESOLVED_WITH_CONTAMINATION = "resolved_with_contamination"
-
-class ResolveMode(Enum):
-    SCORE = "score"
-    STRICT = "strict"
-    STRICT_UNIQUE = "strict-unique"
 
 def format_output(states: dict[str, BusResolveState], verbosity: int) -> list[dict]:
     results: list[dict] = []
@@ -87,121 +41,6 @@ def format_output(states: dict[str, BusResolveState], verbosity: int) -> list[di
 
     return results
 
-@dataclass
-class ScoreDetails:
-    scores: dict[str, int]
-    unique_hit_ids: dict[str, set[int]]
-    shared_hit_ids: dict[str, set[int]]
-    foreign_ids: dict[str, set[int]]
-
-def calculate_score_details(state: BusResolveState, id2bus: Id2BusMap) -> ScoreDetails:
-    scores: dict[str, int] = defaultdict(int)
-    unique_hit_ids: dict[str, set[int]] = defaultdict(set)
-    shared_hit_ids: dict[str, set[int]] = defaultdict(set)
-    labels_by_id: dict[int, set[str]] = {}
-
-    for can_id in sorted(state.observed_id_counts.keys()):
-        labels = id2bus.get_labels(can_id)
-        if not labels:
-            continue
-
-        labels_by_id[can_id] = labels
-        if len(labels) == 1:
-            label = next(iter(labels))
-            scores[label] += UNIQUE_ID_SCORE
-            unique_hit_ids[label].add(can_id)
-            continue
-
-        score = SHARED_ID_SCORE
-        for label in labels:
-            scores[label] += score
-            shared_hit_ids[label].add(can_id)
-
-    foreign_ids: dict[str, set[int]] = defaultdict(set)
-    for label in list(scores.keys()):
-        for can_id, labels in labels_by_id.items():
-            if label in labels:
-                continue
-
-            scores[label] -= FOREIGN_ID_PENALTY
-            foreign_ids[label].add(can_id)
-
-    return ScoreDetails(
-        scores=dict(scores),
-        unique_hit_ids={label: set(ids) for label, ids in unique_hit_ids.items()},
-        shared_hit_ids={label: set(ids) for label, ids in shared_hit_ids.items()},
-        foreign_ids={label: set(ids) for label, ids in foreign_ids.items()},
-    )
-
-def sort_score_items(scores: dict[str, int]) -> list[tuple[str, int]]:
-    return sorted(scores.items(), key=lambda item: (-item[1], item[0]))
-
-def format_id_list(ids: set[int]) -> list[str]:
-    return [int_canid_to_hex(can_id) for can_id in sorted(ids)]
-
-def format_id_map(items: dict[str, set[int]]) -> dict[str, list[str]]:
-    return {
-        label: format_id_list(ids)
-        for label, ids in sorted(items.items())
-        if ids
-    }
-
-def resolve_score_result(details: ScoreDetails) -> tuple[ResolveResult, list[str]]:
-    ranked_scores = sort_score_items(details.scores)
-    if not ranked_scores:
-        return ResolveResult.NO_VALID_ID_FOUND, []
-
-    top_label, top_score = ranked_scores[0]
-    second_score = ranked_scores[1][1] if len(ranked_scores) > 1 else None
-    has_score_margin = second_score is None or top_score > second_score
-
-    if has_score_margin:
-        if details.foreign_ids.get(top_label):
-            return ResolveResult.RESOLVED_WITH_CONTAMINATION, [top_label]
-        return ResolveResult.RESOLVED, [top_label]
-
-    ambiguous_labels = [
-        label
-        for label, score in ranked_scores
-        if top_score == score
-    ]
-    if len(ambiguous_labels) == 1 and len(ranked_scores) > 1:
-        ambiguous_labels.append(ranked_scores[1][0])
-
-    return ResolveResult.MULTIPLE_CANDIDATES, sorted(ambiguous_labels)
-
-def format_score_output(
-    states: dict[str, BusResolveState],
-    id2bus: Id2BusMap,
-    verbosity: int,
-) -> list[dict]:
-    results: list[dict] = []
-    for bus_number in sorted(states.keys(), key=lambda x: int(x)):
-        state = states[bus_number]
-        details = calculate_score_details(state, id2bus)
-        result, labels = resolve_score_result(details)
-
-        result_item = {
-            "bus_number": bus_number,
-            "result": result.value,
-            "labels": labels,
-        }
-
-        if verbosity >= 1:
-            result_item["matched_ids"] = format_id_list(state.matched_ids)
-            result_item["ignored_ids"] = format_id_list(state.ignored_ids)
-            result_item["unknown_ids"] = format_id_list(state.unknown_ids)
-            result_item["scores"] = {
-                label: details.scores[label]
-                for label, _score in sort_score_items(details.scores)
-            }
-            result_item["unique_hit_ids"] = format_id_map(details.unique_hit_ids)
-            result_item["shared_hit_ids"] = format_id_map(details.shared_hit_ids)
-            result_item["foreign_ids"] = format_id_map(details.foreign_ids)
-
-        results.append(result_item)
-
-    return results
 
 def apply_unique_label_resolution(states: dict[str, BusResolveState]) -> None:
     changed = True
@@ -224,15 +63,16 @@ def apply_unique_label_resolution(states: dict[str, BusResolveState]) -> None:
                 state.candidates = after
                 changed = True
 
+
 def resolve_bus_labels(
-        input_asc: str,
-        id2bus_json: str,
-        config_json: str | None,
-        mode: str | ResolveMode,
-        max_frames: int,
-        verbosity: int,
-        ignore_unknown_ids: bool
-    ) -> list[dict]:
+    input_asc: str,
+    id2bus_json: str,
+    config_json: str | None,
+    mode: str | ResolveMode,
+    max_frames: int,
+    verbosity: int,
+    ignore_unknown_ids: bool,
+) -> list[dict]:
     resolve_mode = ResolveMode(mode)
     id2bus = Id2BusMap.load_json(id2bus_json)
     ignore_config = IdentifierConfig.load_json(config_json)
@@ -253,7 +93,7 @@ def resolve_bus_labels(
 
             if frame.bus_number not in states:
                 states[frame.bus_number] = BusResolveState(
-                    bus_number = frame.bus_number
+                    bus_number=frame.bus_number
                 )
             state = states[frame.bus_number]
 
@@ -281,36 +121,3 @@ def resolve_bus_labels(
 
     results: list[dict] = format_output(states, verbosity)
     return results
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input_asc", help="Input ASC file")
-    parser.add_argument("id2bus_json", help="JSON file generated by generate_id2bus_map.py")
-    parser.add_argument("-O", "--output", help="output file")
-    parser.add_argument("-c", "--config-json", help="Configuration file for adding settings such as ignore IDs")
-    parser.add_argument("--mode", choices=[mode.value for mode in ResolveMode], default=ResolveMode.SCORE.value, help="Bus resolving mode. Default: score.")
-    parser.add_argument("-m", "--max-frames", type=int, default=10000, help="Maximum number of ASC frames to read")
-    parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
-    parser.add_argument("--ignore-unknown-ids",action="store_true",help="Ignore CAN IDs that are not found in the id2bus map",)
-    args = parser.parse_args()
-
-    asc_busmap = resolve_bus_labels(
-        args.input_asc,
-        args.id2bus_json,
-        args.config_json,
-        args.mode,
-        args.max_frames,
-        args.verbosity,
-        args.ignore_unknown_ids
-    )
-
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as fp:
-            json.dump(asc_busmap, fp, ensure_ascii=False, indent=2)
-    else:
-        pprint.pprint(asc_busmap)
-
-    return 0
-
-if __name__ == '__main__':
-    sys.exit(main())
